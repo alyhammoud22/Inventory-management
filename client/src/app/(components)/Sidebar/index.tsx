@@ -82,7 +82,7 @@ const Sidebar = () => {
         }`}
       >
         <Image
-          src=""
+          src="http://localhost:8000/uploads/logo.png"
           alt="hmstock-logo"
           width={27}
           height={27}

@@ -5,16 +5,24 @@ import Header from "@/app/(components)/Header";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 
 const columns: GridColDef[] = [
-  { field: "userId", headerName: "ID", width: 90 },
-  { field: "name", headerName: "Name", width: 200 },
-  { field: "email", headerName: "Email", width: 200 },
+  { field: "userId", headerName: "ID", width: 70 },
+  { field: "name", headerName: "Name", flex: 1, minWidth: 150 },
+  { field: "email", headerName: "Email", flex: 1.2, minWidth: 200 },
+  {
+    field: "password",
+    headerName: "Password",
+    flex: 0.8,
+    minWidth: 150,
+    renderCell: () => <span className="text-gray-400">••••••••</span>,
+  },
+  { field: "role", headerName: "Role", flex: 0.8, minWidth: 120 },
 ];
 
 const Users = () => {
   const { data: users, isError, isLoading } = useGetUsersQuery();
 
   if (isLoading) {
-    return <div className="py-4">Loading...</div>;
+    return <div className="p-4">Loading...</div>;
   }
 
   if (isError || !users) {
@@ -24,15 +32,22 @@ const Users = () => {
   }
 
   return (
-    <div className="flex flex-col">
-      <Header name="Users" />
-      <DataGrid
-        rows={users}
-        columns={columns}
-        getRowId={(row) => row.userId}
-        checkboxSelection
-        className="bg-white shadow rounded-lg border border-gray-200 mt-5 !text-gray-700"
-      />
+    <div className="mx-auto w-full pb-10">
+      <div className="flex justify-between items-center mb-6">
+        <Header name="Users" />
+      </div>
+
+      <div className="bg-white shadow rounded-xl border border-gray-200 p-4">
+        <DataGrid
+          rows={users}
+          columns={columns}
+          getRowId={(row) => row.userId}
+          autoHeight
+          checkboxSelection
+          disableRowSelectionOnClick
+          className="!text-gray-800"
+        />
+      </div>
     </div>
   );
 };

@@ -4,12 +4,16 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "path";
 
 /* Route Imports */
 import dashboardRoutes from "./routes/dashboardRoutes";
 import productRoutes from "./routes/productRoutes";
 import userRoutes from "./routes/userRoutes";
 import expenseRoutes from "./routes/expenseRoutes";
+import uploadRoutes from "./routes/uploadRoutes";
+import unitRoutes from "./routes/unitRoutes";
+import categoryRoutes from "./routes/categoryRoutes";
 
 /* Configrations */
 dotenv.config();
@@ -21,12 +25,16 @@ app.use(morgan("common"));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 /* Routes */
 app.use("/dashboard", dashboardRoutes); // http://localhost:8000/dashboard
 app.use("/products", productRoutes); // http://localhost:8000/products
 app.use("/users", userRoutes); // http://localhost:8000/users
 app.use("/expenses", expenseRoutes); // http://localhost:8000/expenses
+app.use("/upload", uploadRoutes); // http://localhost:8000/upload
+app.use("/units", unitRoutes);
+app.use("/categories", categoryRoutes);
 
 /* Server */
 const port = process.env.PORT || 3000;
