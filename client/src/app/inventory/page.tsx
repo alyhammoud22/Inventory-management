@@ -13,11 +13,6 @@ import {
   Card,
   CardContent,
   Typography,
-  Modal,
-  Fade,
-  Backdrop,
-  Divider,
-  Button,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -30,16 +25,22 @@ import {
   AccessTime as AccessTimeIcon,
   Error as ErrorIcon,
   Category as CategoryIcon,
-  Close as CloseIcon,
+  LocalOffer as PriceIcon,
+  Numbers as BarcodeIcon,
+  Layers as UnitIcon,
+  DateRange as DateIcon,
+  ProductionQuantityLimits as StockIcon,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
+import Barcode from "react-barcode";
 
 type ProductType = {
   productId: number;
   name: string;
+  nameArabic?: string | null;
   barcode?: string;
-  price?: number;
+  prices?: { id: number; name: string; value: number }[];
   rating?: number | null;
   stockQuantity: number;
   imageUrl?: string | null;
@@ -56,15 +57,14 @@ const Inventory = () => {
   const [deleteProduct] = useDeleteProductMutation();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
-  const [selectedProduct, setSelectedProduct] = useState<ProductType | null>(
-    null
-  );
   const router = useRouter();
 
   const safeProducts: ProductType[] = useMemo(() => {
     return (products || []).map((p: any) => ({
       ...p,
       productId: Number(p.productId),
+      name: p.name,
+      nameArabic: p.nameArabic || "",
     }));
   }, [products]);
 
@@ -135,23 +135,107 @@ const Inventory = () => {
     }
   };
 
+  const getRowColor = (product: ProductType) => {
+    const today = new Date();
+    const expiry = product.expiryDate ? new Date(product.expiryDate) : null;
+
+    if (expiry && expiry < today) return "row-expired";
+    if (
+      expiry &&
+      expiry <= new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
+    )
+      return "row-expiring";
+    if (product.stockQuantity < 10) return "row-lowstock";
+    return "row-healthy";
+  };
+
+  // 📊 DataGrid columns
   const columns: GridColDef[] = [
-    { field: "barcode", headerName: "Barcode", width: 140 },
-    { field: "name", headerName: "Name", width: 220 },
     {
-      field: "الوصف بالعربية",
-      headerName: "وصف المنتج",
-      width: 220,
+      field: "barcode",
+      headerName: "Barcode",
+      width: 170,
+      renderHeader: () => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <BarcodeIcon sx={{ color: "#1976d2" }} />
+          <span>Barcode</span>
+        </Box>
+      ),
+      renderCell: (params) =>
+        params.value ? (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+            }}
+          >
+            <Barcode
+              value={params.value}
+              height={20}
+              width={1}
+              displayValue={false} // hides text inside the barcode
+              margin={0}
+              background="transparent"
+            />
+            <Typography
+              variant="caption"
+              sx={{ fontSize: 10, mt: 0.5, textAlign: "center" }}
+            >
+              {params.value}
+            </Typography>
+          </Box>
+        ) : (
+          "—"
+        ),
+    },
+
+    {
+      field: "name",
+      headerName: "Product Name",
+      width: 300,
+      renderHeader: () => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <InventoryIcon sx={{ color: "#16a34a" }} />
+          <span>Product</span>
+        </Box>
+      ),
       renderCell: (params) => (
         <div
           style={{
-            fontSize: "0.85em",
-            color: "#555",
-            direction: "rtl", // ensures Arabic text looks correct
-            fontFamily: "Tajawal, 'Noto Naskh Arabic', sans-serif",
+            display: "flex",
+            justifyContent: "space-between", // This will push the Arabic name to the end
+            alignItems: "center", // Align items vertically centered
           }}
         >
-          {params.row.nameArabic || ""}
+          {/* English Name */}
+          <span
+            style={{
+              fontSize: "1.05em",
+              fontWeight: 600,
+              color: "#111",
+              fontFamily: "'Inter', 'Roboto', sans-serif",
+            }}
+          >
+            {params.row.name || "—"}
+          </span>
+
+          {/* Arabic Name */}
+          {params.row.nameArabic && (
+            <span
+              style={{
+                fontSize: "1.05em",
+                fontWeight: 600,
+                color: "#111",
+                direction: "rtl", // Right-to-left for Arabic
+                fontFamily: "'tajawal', sans-serif",
+              }}
+            >
+              {params.row.nameArabic}
+            </span>
+          )}
         </div>
       ),
     },
@@ -159,38 +243,117 @@ const Inventory = () => {
       field: "category",
       headerName: "Category",
       width: 150,
+      renderHeader: () => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <CategoryIcon sx={{ color: "#7031d6" }} />
+          <span>Category</span>
+        </Box>
+      ),
       valueGetter: (value, row) => row.category?.name || "—",
     },
     {
-      field: "price",
-      headerName: "Price",
-      width: 110,
-      type: "number",
-      valueGetter: (value, row) => `$${row.price?.toFixed(2) || "0.00"}`,
+      field: "costPrice",
+      headerName: "Cost Price",
+      width: 130,
+      renderHeader: () => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <PriceIcon sx={{ color: "#eab308" }} />
+          <span>Cost Price</span>
+        </Box>
+      ),
+      valueGetter: (value, row) => {
+        // find the price with id = 1 or name = "Cost"
+        const cost = row.prices?.find(
+          (p: any) => p.id === 1 || p.name.toLowerCase().includes("cost")
+        );
+        return cost ? `$${cost.value.toFixed(2)}` : "—";
+      },
     },
     {
       field: "stockQuantity",
       headerName: "Stock",
       width: 100,
-      type: "number",
+      renderHeader: () => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <StockIcon sx={{ color: "#f59e0b" }} />
+          <span>Stock</span>
+        </Box>
+      ),
     },
     {
       field: "unit",
       headerName: "Unit",
       width: 120,
+      renderHeader: () => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <UnitIcon sx={{ color: "#3b82f6" }} />
+          <span>Unit</span>
+        </Box>
+      ),
       valueGetter: (value, row) => row.unit?.name || "—",
     },
     {
       field: "expiryDate",
       headerName: "Expiry",
-      width: 140,
-      valueGetter: (value, row) =>
-        row.expiryDate ? new Date(row.expiryDate).toLocaleDateString() : "—",
+      width: 180,
+      renderHeader: () => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <AccessTimeIcon sx={{ color: "#0288d1" }} />
+          <span>Expiry</span>
+        </Box>
+      ),
+      renderCell: (params) => {
+        if (!params.row.expiryDate) return "—";
+
+        const expiry = new Date(params.row.expiryDate);
+        const today = new Date();
+
+        const daysLeft = Math.ceil(
+          (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        let color = "#16a34a"; // green (healthy)
+        let label = "";
+
+        if (daysLeft < 0) {
+          color = "#dc2626"; // red
+          label = `Expired ${Math.abs(daysLeft)}d ago`;
+        } else if (daysLeft <= 30) {
+          color = "#f59e0b"; // orange
+          label = `Expiring in ${daysLeft}d`;
+        } else {
+          color = "#16a34a"; // green
+          label = `In ${daysLeft}d`;
+        }
+
+        return (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+            }}
+          >
+            <Typography variant="body2" sx={{ color: "#111", fontWeight: 500 }}>
+              {expiry.toLocaleDateString()}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{ color, fontWeight: "bold", fontSize: "0.8rem" }}
+            >
+              {label}
+            </Typography>
+          </Box>
+        );
+      },
     },
+
     {
       field: "actions",
       headerName: "Actions",
       width: 120,
+      renderHeader: () => <span>Actions</span>,
       sortable: false,
       renderCell: (params) => (
         <div className="flex items-center gap-1">
@@ -217,40 +380,6 @@ const Inventory = () => {
     },
   ];
 
-  const CardButton = ({
-    title,
-    value,
-    color,
-    icon: Icon,
-    filter,
-  }: {
-    title: string;
-    value: number;
-    color: string;
-    icon: any;
-    filter: FilterType;
-  }) => (
-    <Card
-      onClick={() => setActiveFilter(filter)}
-      className={`cursor-pointer transition-transform hover:scale-105 ${
-        activeFilter === filter ? "ring-4 ring-offset-2" : ""
-      }`}
-      sx={{
-        borderColor: color,
-        backgroundColor: `${color}10`,
-        color,
-      }}
-    >
-      <CardContent className="flex flex-col items-center">
-        <Icon fontSize="large" />
-        <Typography variant="h6">{title}</Typography>
-        <Typography variant="h5" fontWeight="bold">
-          {value}
-        </Typography>
-      </CardContent>
-    </Card>
-  );
-
   if (isLoading)
     return (
       <div className="flex justify-center items-center py-10">
@@ -268,43 +397,59 @@ const Inventory = () => {
     <div className="flex flex-col p-5 bg-gray-50 min-h-screen">
       <Header name="Inventory" />
 
-      {/* 🔹 Cards */}
+      {/* 🔹 Stats Cards */}
       <Box className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-5">
-        <CardButton
-          title="Total"
-          value={stats.total}
-          color="#1976d2"
-          icon={InventoryIcon}
-          filter="all"
-        />
-        <CardButton
-          title="Low Stock"
-          value={stats.lowStock}
-          color="#f59e0b"
-          icon={WarningIcon}
-          filter="lowStock"
-        />
-        <CardButton
-          title="Expired"
-          value={stats.expired}
-          color="#dc2626"
-          icon={ErrorIcon}
-          filter="expired"
-        />
-        <CardButton
-          title="Expiring Soon"
-          value={stats.expiringSoon}
-          color="#ea580c"
-          icon={AccessTimeIcon}
-          filter="expiringSoon"
-        />
-        <CardButton
-          title="Healthy"
-          value={stats.healthyStock}
-          color="#16a34a"
-          icon={CheckCircleIcon}
-          filter="healthy"
-        />
+        {(
+          [
+            ["Total", stats.total, "#1976d2", InventoryIcon, "all"],
+            ["Low Stock", stats.lowStock, "#f59e0b", WarningIcon, "lowStock"],
+            ["Expired", stats.expired, "#dc2626", ErrorIcon, "expired"],
+            [
+              "Expiring Soon",
+              stats.expiringSoon,
+              "#ea580c",
+              AccessTimeIcon,
+              "expiringSoon",
+            ],
+            [
+              "Healthy",
+              stats.healthyStock,
+              "#16a34a",
+              CheckCircleIcon,
+              "healthy",
+            ],
+          ] as const
+        ).map(([title, value, color, Icon, filter]) => {
+          const IconComp = Icon as React.ElementType;
+          return (
+            <Card
+              key={String(filter)}
+              onClick={() => setActiveFilter(filter as FilterType)}
+              sx={{
+                borderColor: color,
+                backgroundColor: `${color}10`,
+                color,
+                cursor: "pointer",
+                transition: "all 0.25s ease",
+                borderRadius: "1rem",
+                "&:hover": {
+                  transform: "translateY(-5px) scale(1.03)",
+                  boxShadow: `0px 6px 12px ${color}40`,
+                },
+              }}
+            >
+              <CardContent className="flex flex-col items-center">
+                <IconComp fontSize="large" />
+                <Typography variant="h6" sx={{ mt: 1 }}>
+                  {title}
+                </Typography>
+                <Typography variant="h5" fontWeight="bold">
+                  {value as number}
+                </Typography>
+              </CardContent>
+            </Card>
+          );
+        })}
       </Box>
 
       {/* 🔹 Search + Add */}
@@ -331,7 +476,7 @@ const Inventory = () => {
           />
           <Tooltip title="Add Product">
             <IconButton
-              onClick={() => router.push("/inventory/add")}
+              onClick={() => router.push("/inventory/create")}
               sx={{ color: "#2e7d32" }}
             >
               <AddBoxIcon fontSize="large" />
@@ -341,24 +486,50 @@ const Inventory = () => {
       </Box>
 
       {/* 🔹 Table */}
-      <Box className="bg-white shadow rounded-lg border border-gray-200 mt-5 overflow-hidden">
+      <Box
+        className="bg-white shadow rounded-lg border border-gray-200 mt-5 overflow-hidden"
+        sx={{
+          "& .MuiDataGrid-row:nth-of-type(even)": {
+            backgroundColor: "#f9fafb",
+          },
+          "& .MuiDataGrid-row:nth-of-type(odd)": {
+            backgroundColor: "#ffffff",
+          },
+        }}
+      >
         <DataGrid
           rows={filteredProducts}
           columns={columns}
           getRowId={(row) => row.productId}
           autoHeight
           disableRowSelectionOnClick
-          onRowClick={(params) => setSelectedProduct(params.row)}
+          getRowClassName={(params) => getRowColor(params.row)} // ✅ dynamically assign class based on product
           sx={{
             border: "none",
             "& .MuiDataGrid-columnHeaders": {
               backgroundColor: "#f3f4f6",
               fontWeight: "bold",
               color: "#374151",
+              fontSize: "15px",
+            },
+            "& .MuiDataGrid-cell": {
+              padding: "10px",
             },
             "& .MuiDataGrid-row:hover": {
-              backgroundColor: "rgba(243,244,246,0.4)",
-              cursor: "pointer",
+              backgroundColor: "#e0f2fe !important", // nice hover color
+            },
+            // ✅ Define color mappings here
+            "& .row-expired": {
+              backgroundColor: "#fdecea !important",
+            },
+            "& .row-expiring": {
+              backgroundColor: "#fff4e5 !important",
+            },
+            "& .row-lowstock": {
+              backgroundColor: "#e3f2fd !important",
+            },
+            "& .row-healthy": {
+              backgroundColor: "#e8f5e9 !important",
             },
           }}
         />

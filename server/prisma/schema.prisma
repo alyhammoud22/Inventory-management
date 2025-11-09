@@ -29,31 +29,39 @@ model ProductUnit {
 }
 
 model Products {
-  productId       Int       @id @default(autoincrement())
-  imageUrl        String?
-  barcode         String?
-  nameArabic String?
-  name            String
-  price           Float
-  rating          Float?
-  stockQuantity   Int
- 
-  productionDate  DateTime?
-  expiryDate      DateTime?
-  
-  categoryId      Int?
-  subCategoryId   Int?
-  unitId          Int?
+  productId        Int              @id @default(autoincrement())
+  imageUrl         String?
+  barcode          String?
+  nameArabic       String?
+  name             String
+  rating           Float?
+  stockQuantity    Int
+  productionDate   DateTime?
+  expiryDate       DateTime?
+  categoryId       Int?
+  subCategoryId    Int?
+  unitId           Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  category         ProductCategory? @relation(fields: [categoryId], references: [categoryId])
+  subCategory      ProductSubCategory? @relation(fields: [subCategoryId], references: [subCategoryId])
+  unit             ProductUnit?     @relation(fields: [unitId], references: [unitId])
 
-  category        ProductCategory?  @relation(fields: [categoryId], references: [categoryId])
-  subCategory     ProductSubCategory? @relation(fields: [subCategoryId], references: [subCategoryId])
-  unit            ProductUnit? @relation(fields: [unitId], references: [unitId])
+  Sales            Sales[]
+  Purchases        Purchases[]
+  prices           ProductPrice[]   @relation("ProductPrices") // 🧩 added
+}
 
-  Sales           Sales[]
-  Purchases       Purchases[]
+model ProductPrice {
+  id          Int       @id @default(autoincrement())
+  productId   Int
+  name        String    // e.g. "Cost", "Selling (sem IVA)", "Selling (com IVA)"
+  value       Float
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  product     Products  @relation("ProductPrices", fields: [productId], references: [productId], onDelete: Cascade)
 }
 
 

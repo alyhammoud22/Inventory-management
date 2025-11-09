@@ -24,7 +24,8 @@ export interface Product {
   productId: string;
   barcode: string;
   name: string;
-  price: number;
+  nameArabic?: string;
+  prices?: ProductPrice[];
   rating?: number;
   stockQuantity: number;
   imageUrl?: string;
@@ -35,9 +36,15 @@ export interface Product {
   unit?: Unit;
 }
 
+export interface ProductPrice {
+  id?: string;
+  name: string;
+  value: number;
+}
+
 export interface NewProduct {
   name: string;
-  price: number;
+  prices: ProductPrice[];
   rating?: number;
   stockQuantity: number;
 }
